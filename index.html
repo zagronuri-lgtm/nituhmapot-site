@@ -6,7 +6,7 @@
     <title>כלי ניתוח מפות תנועה | תקנה 168</title>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        :root { --bg-primary: #0a0e17; --bg-secondary: #111827; --bg-card: #1a2234; --accent-red: #ef4444; --accent-green: #22c55e; --accent-yellow: #eab308; --accent-blue: #3b82f6; --accent-cyan: #06b6d4; --accent-purple: #a855f7; --accent-orange: #f97316; --text-primary: #f8fafc; --text-secondary: #94a3b8; --border-color: #2a3a52; }
+        :root { --bg-primary: #000000; --bg-secondary: #0a0a0a; --bg-card: #111111; --accent-red: #ef4444; --accent-green: #22c55e; --accent-yellow: #eab308; --accent-blue: #3b82f6; --accent-cyan: #06b6d4; --accent-purple: #a855f7; --accent-orange: #f97316; --text-primary: #ffffff; --text-secondary: #888888; --border-color: #222222; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Heebo', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
         .container { max-width: 1900px; margin: 0 auto; padding: 1rem; }
@@ -259,8 +259,9 @@
                             <th onclick="sortTrips('dynamic_pct')">אחוזון</th>
                             <th onclick="sortTrips('pct_value')">ערך</th>
                             <th onclick="sortTrips('gap_to_next')">פער</th>
-                            <th onclick="sortTrips('prob_non_exec')">אי-ביצוע</th>
-                            <th onclick="sortTrips('prob_inaccuracy')">אי-דיוק</th>
+                            <th onclick="sortTrips('prob_non_exec')" title="סיכון במצב נוכחי">NE נוכחי</th>
+                            <th onclick="sortTrips('prob_non_exec_rec')" title="סיכון אחרי אימוץ המלצה">NE אחרי</th>
+                            <th onclick="sortTrips('prob_inaccuracy')" title="סיכון במצב נוכחי">IN נוכחי</th>
                             <th>סטטוס</th>
                             <th>המלצה</th>
                             <th onclick="sortTrips('rec_duration')">הגדרה</th>
@@ -311,7 +312,7 @@
                             <th>אחוזון</th>
                             <th onclick="sortRoutes('avg_non_exec')">אי-ביצוע</th>
                             <th onclick="sortRoutes('avg_inaccuracy')">אי-דיוק</th>
-                            <th onclick="sortRoutes('daily_non_exec')">צפי/יום</th>
+                            <th onclick="sortRoutes('daily_non_exec')" title="נוכחי → אחרי המלצה">צפי NE/יום</th>
                             <th onclick="sortRoutes('rec_increase')">להעלות</th>
                         </tr></thead>
                         <tbody id="routesBody"></tbody>
@@ -859,8 +860,11 @@
                 tripDurations[`${trip.route}-${trip.direction}-${trip.startTime}`] = pctValue;
                 
                 let probNE = null, probIN = null, probOT = null;
+                let probNE_rec = null, probIN_rec = null, probOT_rec = null;
+                let fit = null;
+                
                 if (!noData && !dynPct.ignore && gapToNext > 0) {
-                    const fit = fitLogNormal(durs);
+                    fit = fitLogNormal(durs);
                     if (fit) {
                         probNE = (1 - logNormalCDF(gapToNext + threshNE, fit.mu, fit.sigma)) * 100;
                         probIN = (logNormalCDF(gapToNext + threshNE, fit.mu, fit.sigma) - logNormalCDF(gapToNext + threshIN, fit.mu, fit.sigma)) * 100;
@@ -876,11 +880,24 @@
                     else if (probIN > targetIN) { rec = 'לבחון העלאה'; recDur = Math.ceil(pctValue); }
                 }
                 
+                // Calculate probabilities after adopting recommendation
+                if (fit && recDur !== planned) {
+                    const newGap = gapToNext + (recDur - planned);
+                    probNE_rec = (1 - logNormalCDF(newGap + threshNE, fit.mu, fit.sigma)) * 100;
+                    probIN_rec = (logNormalCDF(newGap + threshNE, fit.mu, fit.sigma) - logNormalCDF(newGap + threshIN, fit.mu, fit.sigma)) * 100;
+                    probOT_rec = logNormalCDF(newGap + threshIN, fit.mu, fit.sigma) * 100;
+                } else {
+                    probNE_rec = probNE;
+                    probIN_rec = probIN;
+                    probOT_rec = probOT;
+                }
+                
                 tripsResults.push({
                     duty_id: dutyId, route: trip.route, direction: trip.direction, start_time: trip.startTime, hour, planned,
                     dynamic_pct: noData ? 'N/A' : dynPct.label, pct_value: pctValue, gap_to_next: gapToNext, is_last: isLast,
-                    prob_non_exec: probNE, prob_inaccuracy: probIN,
-                    prob_on_time: probOT, rec, rec_duration: recDur, is_ignored: dynPct.ignore, no_data: noData
+                    prob_non_exec: probNE, prob_inaccuracy: probIN, prob_on_time: probOT,
+                    prob_non_exec_rec: probNE_rec, prob_inaccuracy_rec: probIN_rec, prob_on_time_rec: probOT_rec,
+                    rec, rec_duration: recDur, is_ignored: dynPct.ignore, no_data: noData
                 });
             }
             
@@ -920,17 +937,19 @@
 
         routesResults = [];
         const groups = {};
-        tripsResults.filter(t => !t.is_last).forEach(t => {
+        tripsResults.filter(t => !t.is_last && !t.no_data).forEach(t => {
             if (!groups[t.route]) groups[t.route] = [];
             groups[t.route].push(t);
         });
         for (const [route, trips] of Object.entries(groups)) {
             const dynPct = getDynamicPercentile(parseInt(route), 12);
+            const validTrips = trips.filter(t => t.prob_non_exec !== null);
             routesResults.push({
                 route: parseInt(route), trips: trips.length, pct_label: dynPct.ignore ? 'GPS' : dynPct.label,
-                avg_non_exec: trips.reduce((a,t) => a + t.prob_non_exec, 0) / trips.length,
-                avg_inaccuracy: trips.reduce((a,t) => a + t.prob_inaccuracy, 0) / trips.length,
-                daily_non_exec: trips.reduce((a,t) => a + t.prob_non_exec, 0) / 100,
+                avg_non_exec: validTrips.length > 0 ? validTrips.reduce((a,t) => a + (t.prob_non_exec || 0), 0) / validTrips.length : 0,
+                avg_inaccuracy: validTrips.length > 0 ? validTrips.reduce((a,t) => a + (t.prob_inaccuracy || 0), 0) / validTrips.length : 0,
+                daily_non_exec: validTrips.reduce((a,t) => a + (t.prob_non_exec || 0), 0) / 100,
+                daily_non_exec_rec: validTrips.reduce((a,t) => a + (t.prob_non_exec_rec || 0), 0) / 100,
                 rec_increase: trips.filter(t => t.rec === 'להעלות').length
             });
         }
@@ -949,19 +968,39 @@
         const targetNE = parseFloat(document.getElementById('targetNE').value);
         const targetIN = parseFloat(document.getElementById('targetIN').value);
         
-        const dailyNE = withData.reduce((a,t) => a + (t.prob_non_exec || 0), 0) / 100;
-        const dailyIN = withData.reduce((a,t) => a + (t.prob_inaccuracy || 0), 0) / 100;
+        const totalTrips = withData.length;
+        
+        // Count trips exceeding thresholds (current)
         const failsNE = withData.filter(t => t.prob_non_exec !== null && t.prob_non_exec > targetNE).length;
         const failsIN = withData.filter(t => t.prob_non_exec !== null && t.prob_non_exec <= targetNE && t.prob_inaccuracy > targetIN).length;
+        
+        // Count trips exceeding thresholds (after recommendation)
+        const failsNE_rec = withData.filter(t => t.prob_non_exec_rec !== null && t.prob_non_exec_rec > targetNE).length;
+        const failsIN_rec = withData.filter(t => t.prob_non_exec_rec !== null && t.prob_non_exec_rec <= targetNE && t.prob_inaccuracy_rec > targetIN).length;
+        
+        // Percentages
+        const pctNE = totalTrips > 0 ? (failsNE / totalTrips) * 100 : 0;
+        const pctIN = totalTrips > 0 ? (failsIN / totalTrips) * 100 : 0;
+        const pctNE_rec = totalTrips > 0 ? (failsNE_rec / totalTrips) * 100 : 0;
+        const pctIN_rec = totalTrips > 0 ? (failsIN_rec / totalTrips) * 100 : 0;
+        
         const d168PlanFail = dutiesResults.filter(d => !d.plan_compliant).length;
         const d168ActualFail = dutiesResults.filter(d => !d.actual_compliant).length;
         
         document.getElementById('summaryStats').innerHTML = `
             <div class="stat-card"><div class="value blue">${tripsResults.length}</div><div class="label">נסיעות</div></div>
-            <div class="stat-card"><div class="value red">${dailyNE.toFixed(1)}</div><div class="label">צפי אי-ביצוע/יום</div></div>
-            <div class="stat-card"><div class="value yellow">${dailyIN.toFixed(1)}</div><div class="label">צפי אי-דיוק/יום</div></div>
-            <div class="stat-card"><div class="value red">${failsNE}</div><div class="label">חורג NE</div></div>
-            <div class="stat-card"><div class="value yellow">${failsIN}</div><div class="label">חורג IN</div></div>
+            <div class="stat-card">
+                <div class="value red">${pctNE.toFixed(2)}%</div>
+                <div class="label">אי-ביצוע (נוכחי)</div>
+                ${pctNE_rec < pctNE ? `<div style="font-size:0.7rem;color:var(--accent-green);">→ ${pctNE_rec.toFixed(2)}% אחרי המלצה</div>` : ''}
+                <div style="font-size:0.65rem;color:var(--text-secondary);">${failsNE} נסיעות חורגות</div>
+            </div>
+            <div class="stat-card">
+                <div class="value yellow">${pctIN.toFixed(2)}%</div>
+                <div class="label">אי-דיוק (נוכחי)</div>
+                ${pctIN_rec < pctIN ? `<div style="font-size:0.7rem;color:var(--accent-green);">→ ${pctIN_rec.toFixed(2)}% אחרי המלצה</div>` : ''}
+                <div style="font-size:0.65rem;color:var(--text-secondary);">${failsIN} נסיעות חורגות</div>
+            </div>
             <div class="stat-card"><div class="value ${noDataCount>0?'purple':'green'}">${noDataCount}</div><div class="label">אין נתונים</div></div>
             <div class="stat-card"><div class="value ${d168PlanFail>0?'purple':'green'}">${d168PlanFail}</div><div class="label">168 תכנון ✗</div></div>
             <div class="stat-card"><div class="value ${d168ActualFail>0?'red':'green'}">${d168ActualFail}</div><div class="label">168 אחוזון ✗</div></div>
@@ -1009,14 +1048,19 @@
             const recClass = t.rec === 'להעלות' ? 'badge-red' : t.rec === 'לבחון העלאה' ? 'badge-yellow' : t.rec === 'אין נתונים' ? 'badge-gray' : 'badge-green';
             const pctClass = t.dynamic_pct === 'N/A' ? 'badge-gray' : t.dynamic_pct === 'P95' ? 'badge-orange' : t.dynamic_pct === 'P90' ? 'badge-blue' : t.dynamic_pct === 'GPS' ? 'badge-gray' : 'badge-green';
             
+            // Show separate columns for current and after-recommendation
             const probNEText = t.prob_non_exec === null ? '-' : t.prob_non_exec.toFixed(1) + '%';
+            const probNERecText = t.prob_non_exec_rec === null ? '-' : t.prob_non_exec_rec.toFixed(1) + '%';
             const probINText = t.prob_inaccuracy === null ? '-' : t.prob_inaccuracy.toFixed(1) + '%';
+            
+            const neRecImproved = t.prob_non_exec_rec !== null && t.prob_non_exec !== null && t.prob_non_exec_rec < t.prob_non_exec;
             
             return `<tr class="${!t.no_data && t.prob_non_exec > 5 ? 'highlight-row' : ''}">
                 <td>${t.duty_id}</td><td><strong>${t.route}</strong></td><td>${t.direction}</td><td>${t.start_time}</td><td>${t.planned}</td>
                 <td><span class="badge ${pctClass}">${t.dynamic_pct}</span></td><td><strong>${t.pct_value.toFixed(0)}</strong></td>
                 <td>${t.is_last ? '<span class="badge badge-blue">אחרון</span>' : t.gap_to_next}</td>
                 <td style="color:${!neOk && !t.no_data?'var(--accent-red)':''}">${probNEText}</td>
+                <td style="color:${neRecImproved?'var(--accent-green)':''}">${probNERecText}</td>
                 <td style="color:${!inOk && !t.no_data?'var(--accent-yellow)':''}">${probINText}</td>
                 <td>${status}</td><td><span class="badge ${recClass}">${t.rec}</span></td><td><strong>${t.rec_duration}'</strong></td>
                 <td>${t.duty_168_plan?'<span class="badge badge-green">✓</span>':'<span class="badge badge-purple">✗</span>'}</td>
@@ -1052,9 +1096,13 @@
         document.getElementById('routesBody').innerHTML = routesResults.sort((a,b) => b.avg_non_exec - a.avg_non_exec).map(r => {
             const neColor = r.avg_non_exec > 5 ? 'var(--accent-red)' : r.avg_non_exec > 2 ? 'var(--accent-yellow)' : 'var(--accent-green)';
             const pctClass = r.pct_label === 'P95' ? 'badge-orange' : r.pct_label === 'GPS' ? 'badge-gray' : 'badge-blue';
+            const improved = r.daily_non_exec_rec < r.daily_non_exec;
+            const dailyText = improved ? 
+                `${r.daily_non_exec.toFixed(1)}<span style="color:var(--accent-green);font-size:0.8rem;"> →${r.daily_non_exec_rec.toFixed(1)}</span>` : 
+                r.daily_non_exec.toFixed(1);
             return `<tr><td><strong>קו ${r.route}</strong></td><td>${r.trips}</td><td><span class="badge ${pctClass}">${r.pct_label}</span></td>
                 <td style="color:${neColor}">${r.avg_non_exec.toFixed(2)}%</td><td>${r.avg_inaccuracy.toFixed(2)}%</td>
-                <td>${r.daily_non_exec.toFixed(1)}</td><td>${r.rec_increase}</td></tr>`;
+                <td>${dailyText}</td><td>${r.rec_increase}</td></tr>`;
         }).join('');
     }
 
@@ -1194,10 +1242,26 @@
     }
 
     function exportTripsCSV() {
-        const headers = ['סידור','קו','כיוון','יציאה','תכנון','אחוזון','ערך','פער','אי_ביצוע','אי_דיוק','המלצה','הגדרה','168_תכנון','168_אחוזון'];
+        const headers = ['סידור','קו','כיוון','יציאה','תכנון','אחוזון','ערך','פער','NE_נוכחי','NE_אחרי','IN_נוכחי','המלצה','הגדרה','168_תכנון','168_אחוזון'];
         let csv = headers.join(',') + '\n';
         tripsResults.forEach(t => {
-            csv += [t.duty_id,t.route,t.direction,t.start_time,t.planned,t.dynamic_pct,t.pct_value.toFixed(1),t.gap_to_next,t.prob_non_exec.toFixed(2),t.prob_inaccuracy.toFixed(2),t.rec,t.rec_duration,t.duty_168_plan?'V':'X',t.duty_168_actual?'V':'X'].join(',') + '\n';
+            csv += [
+                t.duty_id,
+                t.route,
+                t.direction,
+                t.start_time,
+                t.planned,
+                t.dynamic_pct,
+                t.pct_value ? t.pct_value.toFixed(1) : '-',
+                t.is_last ? 'אחרון' : t.gap_to_next,
+                t.prob_non_exec !== null ? t.prob_non_exec.toFixed(2) : '-',
+                t.prob_non_exec_rec !== null ? t.prob_non_exec_rec.toFixed(2) : '-',
+                t.prob_inaccuracy !== null ? t.prob_inaccuracy.toFixed(2) : '-',
+                t.rec,
+                t.rec_duration,
+                t.duty_168_plan ? 'V' : 'X',
+                t.duty_168_actual ? 'V' : 'X'
+            ].join(',') + '\n';
         });
         downloadCSV(csv, 'trips_analysis.csv');
     }
