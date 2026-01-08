@@ -72,6 +72,10 @@
         .date-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.5rem; min-height: 30px; padding: 0.5rem; background: var(--bg-secondary); border-radius: 6px; }
         .logic-box { background: var(--bg-secondary); border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem; font-size: 0.75rem; }
         .logic-box code { background: rgba(59, 130, 246, 0.2); padding: 0.1rem 0.3rem; border-radius: 3px; }
+        .guide-section h4 { color: var(--accent-cyan); }
+        .guide-section table { border-collapse: collapse; }
+        .guide-section td, .guide-section th { padding: 0.5rem; border-bottom: 1px solid var(--border-color); text-align: right; }
+        .guide-section ul { list-style-type: disc; }
         
         /* Modal styles */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; }
@@ -108,6 +112,7 @@
         <header class="header">
             <h1>🚌 כלי ניתוח מפות תנועה</h1>
             <p style="color: var(--text-secondary); font-size: 0.85rem;">אחוזון דינמי • חיזוי אי-ביצוע ואי-דיוק • בדיקת תקנה 168</p>
+            <button class="btn btn-secondary" onclick="showGuide()" style="margin-top: 0.5rem;">📖 מדריך למשתמש</button>
         </header>
 
         <!-- Upload Section -->
@@ -210,7 +215,7 @@
                 <strong>📌 הגדרות:</strong>
                 • <span style="color: var(--accent-red);">אי-ביצוע</span>: ≥<span id="infoNE">20</span> דק' |
                 • <span style="color: var(--accent-yellow);">אי-דיוק</span>: <span id="infoIN">5</span>-<span id="infoNE2">20</span> דק' |
-                • <span style="color: var(--accent-purple);">תקנה 168</span>: הפסקה ≥30' או 3×15' לכל 4 שעות
+                • <span style="color: var(--accent-purple);">תקנה 168</span>: הפסקה ≥30' או 2×15' לכל 4 שעות
             </div>
 
             <div class="tabs">
@@ -228,6 +233,7 @@
                         <option value="fail_ne">חורג NE</option>
                         <option value="fail_in">חורג IN</option>
                         <option value="ok">תקין</option>
+                        <option value="no_data">אין נתונים</option>
                     </select>
                     <select id="filterRec">
                         <option value="">כל ההמלצות</option>
@@ -323,6 +329,196 @@
                 <button class="modal-close" onclick="closeDutyModal()">&times;</button>
             </div>
             <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <!-- Modal for Guide -->
+    <div id="guideModal" class="modal-overlay hidden" style="display:none;" onclick="if(event.target===this)closeGuide()">
+        <div class="modal" style="max-width: 1000px;">
+            <div class="modal-header">
+                <h2>📖 מדריך למשתמש</h2>
+                <button class="modal-close" onclick="closeGuide()">&times;</button>
+            </div>
+            <div class="modal-body" style="font-size: 0.85rem;">
+                
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                    <button class="btn btn-primary btn-sm" onclick="showGuideSection('rule168')">📜 תקנה 168</button>
+                    <button class="btn btn-secondary btn-sm" onclick="showGuideSection('trips')">📋 לשונית נסיעות</button>
+                    <button class="btn btn-secondary btn-sm" onclick="showGuideSection('duties')">👤 לשונית סידורים</button>
+                    <button class="btn btn-secondary btn-sm" onclick="showGuideSection('routes')">🚌 לשונית קווים</button>
+                    <button class="btn btn-secondary btn-sm" onclick="showGuideSection('percentile')">📐 אחוזון דינמי</button>
+                </div>
+
+                <div id="guideContent">
+                    <!-- Rule 168 Section -->
+                    <div id="guide-rule168" class="guide-section">
+                        <h3 style="color: var(--accent-purple); margin-bottom: 1rem;">📜 תקנה 168 לתקנות התעבורה</h3>
+                        
+                        <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem;">🎯 מטרת התקנה</h4>
+                            <p>למנוע עייפות של נהגי תחבורה ציבורית ורכב כבד, על ידי חיוב הפסקות מנוחה.</p>
+                        </div>
+
+                        <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem;">📋 דרישות התקנה (לפי פרשנות משפטית)</h4>
+                            <p><strong>לכל 4 שעות נהיגה רצופות</strong>, הנהג חייב לקבל אחד מאלה:</p>
+                            <ul style="margin: 0.5rem 1.5rem;">
+                                <li>הפסקה אחת של <strong>30 דקות לפחות</strong></li>
+                                <li><strong>או</strong> 2 הפסקות של <strong>15 דקות לפחות</strong> כל אחת (סה"כ 30 דקות)</li>
+                            </ul>
+                        </div>
+
+                        <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem;">🔄 קטיעת רצף נהיגה</h4>
+                            <p>הפסקה נוספת של <strong>15 דקות או יותר</strong> מעבר לדרישה <strong>קוטעת את רצף הנהיגה</strong> ומתחילה ספירה חדשה של 4 שעות.</p>
+                        </div>
+
+                        <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem;">☕ מה נחשב הפסקה?</h4>
+                            <ul style="margin: 0.5rem 1.5rem;">
+                                <li><strong>standby</strong> - המתנה</li>
+                                <li><strong>break</strong> - הפסקה</li>
+                                <li><strong>meal_break</strong> - הפסקת אוכל</li>
+                                <li><strong>split</strong> - פיצול (נחשב הפסקה!)</li>
+                            </ul>
+                        </div>
+
+                        <div style="background: rgba(168, 85, 247, 0.1); border: 1px solid var(--accent-purple); padding: 1rem; border-radius: 8px;">
+                            <h4 style="margin-bottom: 0.5rem;">📊 בדיקה כפולה בכלי</h4>
+                            <ul style="margin: 0.5rem 1.5rem;">
+                                <li><strong>168 תכנון</strong> - בדיקה לפי זמני סיום מתוכננים במפה</li>
+                                <li><strong>168 אחוזון</strong> - בדיקה לפי זמני סיום צפויים (אחוזון דינמי)</li>
+                            </ul>
+                            <p style="margin-top: 0.5rem; color: var(--accent-yellow);">⚠️ סידור יכול לעמוד בתכנון אבל לא באחוזון אם הנסיעות ארוכות מהמתוכנן!</p>
+                        </div>
+                    </div>
+
+                    <!-- Trips Section -->
+                    <div id="guide-trips" class="guide-section" style="display:none;">
+                        <h3 style="color: var(--accent-blue); margin-bottom: 1rem;">📋 לשונית נסיעות - הסבר עמודות</h3>
+                        
+                        <table style="width: 100%; font-size: 0.8rem;">
+                            <thead>
+                                <tr><th style="text-align: right; padding: 0.5rem;">עמודה</th><th style="text-align: right; padding: 0.5rem;">הסבר</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><strong>סידור</strong></td><td>מספר זיהוי הסידור (Duty ID) אליו שייכת הנסיעה</td></tr>
+                                <tr><td><strong>קו</strong></td><td>מספר הקו</td></tr>
+                                <tr><td><strong>כיוון</strong></td><td>כיוון הנסיעה (1 או 2)</td></tr>
+                                <tr><td><strong>יציאה</strong></td><td>שעת היציאה המתוכננת</td></tr>
+                                <tr><td><strong>תכנון</strong></td><td>משך הנסיעה המתוכנן בדקות (לפי המפה)</td></tr>
+                                <tr style="background: rgba(249, 115, 22, 0.1);"><td><strong>אחוזון</strong></td><td>סוג האחוזון שנבחר (P80/P85/P90/P95/GPS) לפי שעה וקו</td></tr>
+                                <tr style="background: rgba(249, 115, 22, 0.1);"><td><strong>ערך</strong></td><td>ערך האחוזון בדקות - המשך הצפוי של הנסיעה</td></tr>
+                                <tr><td><strong>פער</strong></td><td>זמן עד הנסיעה הבאה בסידור (בדקות). "אחרון" = נסיעה אחרונה בסידור</td></tr>
+                                <tr style="background: rgba(239, 68, 68, 0.1);"><td><strong>אי-ביצוע</strong></td><td>הסתברות שהנסיעה הבאה לא תתבצע (איחור מעל 20 דקות)</td></tr>
+                                <tr style="background: rgba(234, 179, 8, 0.1);"><td><strong>אי-דיוק</strong></td><td>הסתברות לאי-דיוק (איחור 5-20 דקות)</td></tr>
+                                <tr><td><strong>סטטוס</strong></td><td>✓ תקין | NE חורג אי-ביצוע | IN חורג אי-דיוק | GPS להתעלם</td></tr>
+                                <tr><td><strong>המלצה</strong></td><td>"להעלות" / "לבחון העלאה" / "לשמור" - המלצה להגדרת זמן הנסיעה</td></tr>
+                                <tr><td><strong>הגדרה</strong></td><td>הזמן המומלץ להגדרה (בדקות)</td></tr>
+                                <tr><td><strong>168 תכנון</strong></td><td>האם הסידור עומד בתקנה 168 לפי זמנים מתוכננים</td></tr>
+                                <tr><td><strong>168 אחוזון</strong></td><td>האם הסידור עומד בתקנה 168 לפי זמנים צפויים</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Duties Section -->
+                    <div id="guide-duties" class="guide-section" style="display:none;">
+                        <h3 style="color: var(--accent-cyan); margin-bottom: 1rem;">👤 לשונית סידורים (168) - הסבר עמודות</h3>
+                        
+                        <table style="width: 100%; font-size: 0.8rem;">
+                            <thead>
+                                <tr><th style="text-align: right; padding: 0.5rem;">עמודה</th><th style="text-align: right; padding: 0.5rem;">הסבר</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><strong>סידור</strong></td><td>מספר זיהוי הסידור (Duty ID)</td></tr>
+                                <tr><td><strong>התחלה</strong></td><td>שעת תחילת הסידור</td></tr>
+                                <tr><td><strong>סיום</strong></td><td>שעת סיום הסידור</td></tr>
+                                <tr><td><strong>משך</strong></td><td>משך הסידור הכולל בשעות</td></tr>
+                                <tr><td><strong>מקטעים</strong></td><td>חלוקת הסידור למקטעים של 4 שעות. ירוק=תקין, אדום=בעייתי</td></tr>
+                                <tr style="background: rgba(168, 85, 247, 0.1);"><td><strong>168 תכנון</strong></td><td>✓ עומד בתקנה לפי זמנים מתוכננים | ✗ לא עומד</td></tr>
+                                <tr style="background: rgba(239, 68, 68, 0.1);"><td><strong>168 אחוזון</strong></td><td>✓ עומד בתקנה לפי זמנים צפויים | ✗ לא עומד</td></tr>
+                                <tr><td><strong>מקטעים בעייתיים</strong></td><td>מספרי המקטעים שלא עומדים בדרישות</td></tr>
+                            </tbody>
+                        </table>
+
+                        <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem;">💡 לחיצה על שורה</h4>
+                            <p>לחיצה על שורה בטבלה תפתח פירוט מלא של הסידור:</p>
+                            <ul style="margin: 0.5rem 1.5rem;">
+                                <li>רשימת כל האירועים (נסיעות, הפסקות, ריקות)</li>
+                                <li>פירוט מקטעים עם סטטוס תכנון ואחוזון</li>
+                                <li>פירוט ההפסקות בכל מקטע</li>
+                            </ul>
+                        </div>
+
+                        <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem;">🔍 פילטרים</h4>
+                            <ul style="margin: 0.5rem 1.5rem;">
+                                <li><strong>תכנון ✓ + אחוזון ✓</strong> - סידורים תקינים לחלוטין</li>
+                                <li><strong>תכנון ✓ אבל אחוזון ✗</strong> - סידורים שעלולים להיות בעייתיים בפועל</li>
+                                <li><strong>תכנון ✗</strong> - סידורים בעייתיים כבר בתכנון</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Routes Section -->
+                    <div id="guide-routes" class="guide-section" style="display:none;">
+                        <h3 style="color: var(--accent-green); margin-bottom: 1rem;">🚌 לשונית קווים - הסבר עמודות</h3>
+                        
+                        <table style="width: 100%; font-size: 0.8rem;">
+                            <thead>
+                                <tr><th style="text-align: right; padding: 0.5rem;">עמודה</th><th style="text-align: right; padding: 0.5rem;">הסבר</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><strong>קו</strong></td><td>מספר הקו</td></tr>
+                                <tr><td><strong>נסיעות</strong></td><td>מספר הנסיעות שנותחו (לא כולל נסיעות אחרונות בסידור)</td></tr>
+                                <tr><td><strong>אחוזון</strong></td><td>סוג האחוזון הרלוונטי לקו (P80-P95 או GPS)</td></tr>
+                                <tr style="background: rgba(239, 68, 68, 0.1);"><td><strong>אי-ביצוע</strong></td><td>ממוצע הסתברות לאי-ביצוע בקו (%)</td></tr>
+                                <tr style="background: rgba(234, 179, 8, 0.1);"><td><strong>אי-דיוק</strong></td><td>ממוצע הסתברות לאי-דיוק בקו (%)</td></tr>
+                                <tr><td><strong>צפי/יום</strong></td><td>מספר מקרי אי-ביצוע צפויים ביום</td></tr>
+                                <tr><td><strong>להעלות</strong></td><td>מספר נסיעות שמומלץ להעלות את זמנן</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Percentile Section -->
+                    <div id="guide-percentile" class="guide-section" style="display:none;">
+                        <h3 style="color: var(--accent-orange); margin-bottom: 1rem;">📐 אחוזון דינמי - הסבר</h3>
+                        
+                        <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem;">🎯 מהו אחוזון?</h4>
+                            <p>אחוזון מייצג את הזמן שבו X% מהנסיעות הסתיימו. לדוגמה:</p>
+                            <ul style="margin: 0.5rem 1.5rem;">
+                                <li><strong>P80 = 45 דקות</strong> → 80% מהנסיעות הסתיימו תוך 45 דקות</li>
+                                <li><strong>P90 = 52 דקות</strong> → 90% מהנסיעות הסתיימו תוך 52 דקות</li>
+                            </ul>
+                        </div>
+
+                        <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem;">⚙️ בחירת אחוזון דינמית</h4>
+                            <p>הכלי בוחר אחוזון שונה לפי שעה וסוג קו:</p>
+                            <table style="width: 100%; margin-top: 0.5rem; font-size: 0.8rem;">
+                                <tr><td><strong>קווים בעייתיים (GPS)</strong></td><td>להתעלם - משתמשים בזמן מתוכנן</td></tr>
+                                <tr><td><strong>קווים עם זנב כבד</strong></td><td style="color: var(--accent-orange);"><strong>P95</strong> - שונות גבוהה</td></tr>
+                                <tr><td><strong>שיא בוקר (06:00-09:00)</strong></td><td style="color: var(--accent-blue);"><strong>P90</strong></td></tr>
+                                <tr><td><strong>שפל יום (09:00-15:00)</strong></td><td style="color: var(--accent-green);"><strong>P85</strong></td></tr>
+                                <tr><td><strong>שיא ערב (15:00-19:00)</strong></td><td style="color: var(--accent-blue);"><strong>P90</strong></td></tr>
+                                <tr><td><strong>שפל ערב (19:00-06:00)</strong></td><td style="color: var(--accent-green);"><strong>P80</strong></td></tr>
+                            </table>
+                        </div>
+
+                        <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px;">
+                            <h4 style="margin-bottom: 0.5rem;">📊 חישוב הסתברויות</h4>
+                            <p>הכלי משתמש במודל <strong>Log-Normal</strong> לחישוב הסתברויות:</p>
+                            <ul style="margin: 0.5rem 1.5rem;">
+                                <li><strong>אי-ביצוע</strong>: הסתברות שהנסיעה תארך יותר מ-(פער + 20 דקות)</li>
+                                <li><strong>אי-דיוק</strong>: הסתברות שהנסיעה תארך בין (פער + 5 דקות) ל-(פער + 20 דקות)</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
         </div>
     </div>
 
@@ -543,8 +739,8 @@
             const breaks15 = breaks.filter(b => b.overlap >= 15).length;
             const has30 = breaks.some(b => b.full >= 30);
             
-            // Check compliance
-            let isOk = has30 || (breaks15 >= 3 && totalBreak >= 45);
+            // Check compliance - New interpretation: 30' break OR 2 breaks of 15'+ (total 30')
+            let isOk = has30 || (breaks15 >= 2 && totalBreak >= 30);
             // If segment is less than 3 hours, it's OK
             const segDuration = actualSegEnd - segStart;
             if (segDuration < 180) isOk = true;
@@ -656,33 +852,35 @@
                 const key = `${trip.route}-${trip.direction}-${bucket}`;
                 let durs = planned < 50 ? (actualsMap.short[key] || []) : (actualsMap.long[key] || []);
                 if (durs.length < 10) durs = [...(actualsMap.short[key] || []), ...(actualsMap.long[key] || [])];
-                if (durs.length < 10) continue;
                 
+                const noData = durs.length < 10;
                 const dynPct = getDynamicPercentile(trip.route, hour);
-                const pctValue = dynPct.ignore ? planned : percentile(durs, dynPct.pct);
+                const pctValue = noData ? planned : (dynPct.ignore ? planned : percentile(durs, dynPct.pct));
                 tripDurations[`${trip.route}-${trip.direction}-${trip.startTime}`] = pctValue;
                 
-                let probNE = 0, probIN = 0, probOT = 100;
-                if (!dynPct.ignore && gapToNext > 0) {
+                let probNE = null, probIN = null, probOT = null;
+                if (!noData && !dynPct.ignore && gapToNext > 0) {
                     const fit = fitLogNormal(durs);
                     if (fit) {
                         probNE = (1 - logNormalCDF(gapToNext + threshNE, fit.mu, fit.sigma)) * 100;
                         probIN = (logNormalCDF(gapToNext + threshNE, fit.mu, fit.sigma) - logNormalCDF(gapToNext + threshIN, fit.mu, fit.sigma)) * 100;
                         probOT = logNormalCDF(gapToNext + threshIN, fit.mu, fit.sigma) * 100;
                     }
+                } else if (dynPct.ignore) {
+                    probNE = 0; probIN = 0; probOT = 100;
                 }
                 
-                let rec = 'לשמור', recDur = planned;
-                if (!dynPct.ignore && gapToNext > 0) {
+                let rec = noData ? 'אין נתונים' : 'לשמור', recDur = planned;
+                if (!noData && !dynPct.ignore && gapToNext > 0 && probNE !== null) {
                     if (probNE > targetNE) { rec = 'להעלות'; recDur = Math.ceil(pctValue); }
                     else if (probIN > targetIN) { rec = 'לבחון העלאה'; recDur = Math.ceil(pctValue); }
                 }
                 
                 tripsResults.push({
                     duty_id: dutyId, route: trip.route, direction: trip.direction, start_time: trip.startTime, hour, planned,
-                    dynamic_pct: dynPct.label, pct_value: pctValue, gap_to_next: gapToNext, is_last: isLast,
-                    prob_non_exec: dynPct.ignore ? 0 : probNE, prob_inaccuracy: dynPct.ignore ? 0 : probIN,
-                    prob_on_time: dynPct.ignore ? 100 : probOT, rec, rec_duration: recDur, is_ignored: dynPct.ignore
+                    dynamic_pct: noData ? 'N/A' : dynPct.label, pct_value: pctValue, gap_to_next: gapToNext, is_last: isLast,
+                    prob_non_exec: probNE, prob_inaccuracy: probIN,
+                    prob_on_time: probOT, rec, rec_duration: recDur, is_ignored: dynPct.ignore, no_data: noData
                 });
             }
             
@@ -746,13 +944,15 @@
 
     function renderSummary() {
         const notLast = tripsResults.filter(t => !t.is_last);
+        const withData = notLast.filter(t => !t.no_data);
+        const noDataCount = tripsResults.filter(t => t.no_data).length;
         const targetNE = parseFloat(document.getElementById('targetNE').value);
         const targetIN = parseFloat(document.getElementById('targetIN').value);
         
-        const dailyNE = notLast.reduce((a,t) => a + t.prob_non_exec, 0) / 100;
-        const dailyIN = notLast.reduce((a,t) => a + t.prob_inaccuracy, 0) / 100;
-        const failsNE = notLast.filter(t => t.prob_non_exec > targetNE).length;
-        const failsIN = notLast.filter(t => t.prob_non_exec <= targetNE && t.prob_inaccuracy > targetIN).length;
+        const dailyNE = withData.reduce((a,t) => a + (t.prob_non_exec || 0), 0) / 100;
+        const dailyIN = withData.reduce((a,t) => a + (t.prob_inaccuracy || 0), 0) / 100;
+        const failsNE = withData.filter(t => t.prob_non_exec !== null && t.prob_non_exec > targetNE).length;
+        const failsIN = withData.filter(t => t.prob_non_exec !== null && t.prob_non_exec <= targetNE && t.prob_inaccuracy > targetIN).length;
         const d168PlanFail = dutiesResults.filter(d => !d.plan_compliant).length;
         const d168ActualFail = dutiesResults.filter(d => !d.actual_compliant).length;
         
@@ -762,9 +962,9 @@
             <div class="stat-card"><div class="value yellow">${dailyIN.toFixed(1)}</div><div class="label">צפי אי-דיוק/יום</div></div>
             <div class="stat-card"><div class="value red">${failsNE}</div><div class="label">חורג NE</div></div>
             <div class="stat-card"><div class="value yellow">${failsIN}</div><div class="label">חורג IN</div></div>
+            <div class="stat-card"><div class="value ${noDataCount>0?'purple':'green'}">${noDataCount}</div><div class="label">אין נתונים</div></div>
             <div class="stat-card"><div class="value ${d168PlanFail>0?'purple':'green'}">${d168PlanFail}</div><div class="label">168 תכנון ✗</div></div>
             <div class="stat-card"><div class="value ${d168ActualFail>0?'red':'green'}">${d168ActualFail}</div><div class="label">168 אחוזון ✗</div></div>
-            <div class="stat-card"><div class="value blue">${dutiesResults.length}</div><div class="label">סידורים</div></div>
         `;
     }
 
@@ -779,9 +979,10 @@
         let filtered = tripsResults.filter(t => {
             if (routeF && t.route != routeF) return false;
             if (recF && t.rec !== recF) return false;
-            if (statusF === 'fail_ne' && t.prob_non_exec <= targetNE) return false;
-            if (statusF === 'fail_in' && (t.prob_non_exec > targetNE || t.prob_inaccuracy <= targetIN)) return false;
-            if (statusF === 'ok' && (t.prob_non_exec > targetNE || t.prob_inaccuracy > targetIN)) return false;
+            if (statusF === 'fail_ne' && (t.no_data || t.prob_non_exec <= targetNE)) return false;
+            if (statusF === 'fail_in' && (t.no_data || t.prob_non_exec > targetNE || t.prob_inaccuracy <= targetIN)) return false;
+            if (statusF === 'ok' && (t.no_data || t.prob_non_exec > targetNE || t.prob_inaccuracy > targetIN)) return false;
+            if (statusF === 'no_data' && !t.no_data) return false;
             if (f168 === 'plan_fail' && t.duty_168_plan) return false;
             if (f168 === 'actual_fail' && t.duty_168_actual) return false;
             return true;
@@ -789,22 +990,34 @@
         
         filtered.sort((a,b) => {
             let av = a[tripsSortCol], bv = b[tripsSortCol];
+            if (av === null) av = -1;
+            if (bv === null) bv = -1;
             if (typeof av === 'string') return tripsSortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
             return tripsSortDir === 'asc' ? av - bv : bv - av;
         });
         
         document.getElementById('tripsBody').innerHTML = filtered.slice(0, 500).map(t => {
-            const neOk = t.prob_non_exec <= targetNE;
-            const inOk = t.prob_inaccuracy <= targetIN;
-            const status = t.is_ignored ? '<span class="badge badge-gray">GPS</span>' : !neOk ? '<span class="badge badge-red">NE</span>' : !inOk ? '<span class="badge badge-yellow">IN</span>' : '<span class="badge badge-green">✓</span>';
-            const recClass = t.rec === 'להעלות' ? 'badge-red' : t.rec === 'לבחון העלאה' ? 'badge-yellow' : 'badge-green';
-            const pctClass = t.dynamic_pct === 'P95' ? 'badge-orange' : t.dynamic_pct === 'P90' ? 'badge-blue' : t.dynamic_pct === 'GPS' ? 'badge-gray' : 'badge-green';
-            return `<tr class="${t.prob_non_exec > 5 ? 'highlight-row' : ''}">
+            const neOk = t.no_data || t.prob_non_exec === null || t.prob_non_exec <= targetNE;
+            const inOk = t.no_data || t.prob_inaccuracy === null || t.prob_inaccuracy <= targetIN;
+            let status;
+            if (t.no_data) status = '<span class="badge badge-gray">N/A</span>';
+            else if (t.is_ignored) status = '<span class="badge badge-gray">GPS</span>';
+            else if (!neOk) status = '<span class="badge badge-red">NE</span>';
+            else if (!inOk) status = '<span class="badge badge-yellow">IN</span>';
+            else status = '<span class="badge badge-green">✓</span>';
+            
+            const recClass = t.rec === 'להעלות' ? 'badge-red' : t.rec === 'לבחון העלאה' ? 'badge-yellow' : t.rec === 'אין נתונים' ? 'badge-gray' : 'badge-green';
+            const pctClass = t.dynamic_pct === 'N/A' ? 'badge-gray' : t.dynamic_pct === 'P95' ? 'badge-orange' : t.dynamic_pct === 'P90' ? 'badge-blue' : t.dynamic_pct === 'GPS' ? 'badge-gray' : 'badge-green';
+            
+            const probNEText = t.prob_non_exec === null ? '-' : t.prob_non_exec.toFixed(1) + '%';
+            const probINText = t.prob_inaccuracy === null ? '-' : t.prob_inaccuracy.toFixed(1) + '%';
+            
+            return `<tr class="${!t.no_data && t.prob_non_exec > 5 ? 'highlight-row' : ''}">
                 <td>${t.duty_id}</td><td><strong>${t.route}</strong></td><td>${t.direction}</td><td>${t.start_time}</td><td>${t.planned}</td>
                 <td><span class="badge ${pctClass}">${t.dynamic_pct}</span></td><td><strong>${t.pct_value.toFixed(0)}</strong></td>
                 <td>${t.is_last ? '<span class="badge badge-blue">אחרון</span>' : t.gap_to_next}</td>
-                <td style="color:${!neOk?'var(--accent-red)':''}">${t.prob_non_exec.toFixed(1)}%</td>
-                <td style="color:${!inOk?'var(--accent-yellow)':''}">${t.prob_inaccuracy.toFixed(1)}%</td>
+                <td style="color:${!neOk && !t.no_data?'var(--accent-red)':''}">${probNEText}</td>
+                <td style="color:${!inOk && !t.no_data?'var(--accent-yellow)':''}">${probINText}</td>
                 <td>${status}</td><td><span class="badge ${recClass}">${t.rec}</span></td><td><strong>${t.rec_duration}'</strong></td>
                 <td>${t.duty_168_plan?'<span class="badge badge-green">✓</span>':'<span class="badge badge-purple">✗</span>'}</td>
                 <td>${t.duty_168_actual?'<span class="badge badge-green">✓</span>':'<span class="badge badge-red">✗</span>'}</td>
@@ -950,7 +1163,7 @@
                     </div>
                     ${!planOk || !actualOk ? `
                         <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color); font-size: 0.8rem;">
-                            <strong>📌 דרישות:</strong> הפסקה ≥30' <strong>או</strong> 3 הפסקות ≥15' (סה"כ 45')
+                            <strong>📌 דרישות:</strong> הפסקה ≥30' <strong>או</strong> 2 הפסקות ≥15' (סה"כ 30')
                         </div>
                     ` : ''}
                 </div>
@@ -964,6 +1177,20 @@
 
     function closeDutyModal() {
         document.getElementById('dutyModal').style.display = 'none';
+    }
+
+    function showGuide() {
+        document.getElementById('guideModal').style.display = 'flex';
+        showGuideSection('rule168');
+    }
+
+    function closeGuide() {
+        document.getElementById('guideModal').style.display = 'none';
+    }
+
+    function showGuideSection(section) {
+        document.querySelectorAll('.guide-section').forEach(s => s.style.display = 'none');
+        document.getElementById('guide-' + section).style.display = 'block';
     }
 
     function exportTripsCSV() {
